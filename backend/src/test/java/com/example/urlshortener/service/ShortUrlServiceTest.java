@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -139,6 +141,47 @@ class ShortUrlServiceTest {
 
         assertThatThrownBy(() -> service.getOriginalUrl("aB12Cd"))
                 .isInstanceOf(ShortUrlNotFoundException.class);
+    }
+
+    @Test
+    void doesNotRedirectWhenClickCountUpdateFails() {
+        ShortUrl entity = new ShortUrl(
+                "aB12Cd",
+                "http://localhost:8080/aB12Cd",
+                "https://example.com/page",
+                new OriginalUrlHasher().hash("https://example.com/page"),
+                NOW);
+        when(repository.findRedirectCandidate("aB12Cd", NOW)).thenReturn(Optional.of(entity));
+        when(repository.recordSuccessfulAccess(null, NOW))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThatThrownBy(() -> service.getOriginalUrl("aB12Cd"))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    @Test
+    void stopsCreationWhenInitialRepositoryLookupFails() {
+        when(repository.findByOriginalUrlHash(anyString()))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThatThrownBy(() -> service.createShortUrl("https://example.com"))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        verify(generator, never()).nextCode();
+        verify(repository, never()).saveAndFlush(any(ShortUrl.class));
+    }
+
+    @Test
+    void doesNotRetryNonConstraintPersistenceFailure() {
+        when(generator.nextCode()).thenReturn("fresh1");
+        when(repository.existsByShortCode("fresh1")).thenReturn(false);
+        when(repository.saveAndFlush(any(ShortUrl.class)))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertThatThrownBy(() -> service.createShortUrl("https://example.com"))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        verify(generator).nextCode();
     }
 
     @Test

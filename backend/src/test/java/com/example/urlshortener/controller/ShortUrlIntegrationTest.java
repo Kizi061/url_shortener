@@ -15,6 +15,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -140,6 +146,11 @@ class ShortUrlIntegrationTest {
         mockMvc.perform(get("/off123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"));
+
+        ShortUrl unchanged = repository.findByShortCode("off123").orElseThrow();
+        assertThat(unchanged.getClickCount()).isZero();
+        assertThat(unchanged.getLastAccessedTimestamp())
+                .isEqualTo(unchanged.getCreatedTimestamp());
     }
 
     @Test
@@ -156,6 +167,11 @@ class ShortUrlIntegrationTest {
         mockMvc.perform(get("/old123"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"));
+
+        ShortUrl unchanged = repository.findByShortCode("old123").orElseThrow();
+        assertThat(unchanged.getClickCount()).isZero();
+        assertThat(unchanged.getLastAccessedTimestamp())
+                .isEqualTo(unchanged.getCreatedTimestamp());
     }
 
     @Test
@@ -164,5 +180,44 @@ class ShortUrlIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Short URL was not found."));
+    }
+
+    @Test
+    void concurrentRedirectsIncrementClickCountWithoutLostUpdates() throws Exception {
+        int requestCount = 20;
+        repository.saveAndFlush(new ShortUrl(
+                "race01",
+                "http://localhost:8080/race01",
+                "https://example.com/concurrent-redirect",
+                new OriginalUrlHasher().hash("https://example.com/concurrent-redirect"),
+                Instant.now()));
+
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> responses = java.util.stream.IntStream.range(0, requestCount)
+                    .mapToObj(index -> executor.submit(() -> {
+                        start.await();
+                        return mockMvc.perform(get("/race01"))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus();
+                    }))
+                    .toList();
+
+            start.countDown();
+
+            for (Future<Integer> response : responses) {
+                assertThat(response.get(10, TimeUnit.SECONDS)).isEqualTo(302);
+            }
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+
+        ShortUrl accessed = repository.findByShortCode("race01").orElseThrow();
+        assertThat(accessed.getClickCount()).isEqualTo(requestCount);
+        assertThat(accessed.getLastAccessedTimestamp())
+                .isAfterOrEqualTo(accessed.getCreatedTimestamp());
     }
 }
