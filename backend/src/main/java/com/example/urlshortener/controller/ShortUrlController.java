@@ -1,6 +1,7 @@
 package com.example.urlshortener.controller;
 
 import com.example.urlshortener.dto.CreateShortUrlRequest;
+import com.example.urlshortener.dto.ShortUrlAnalyticsResponse;
 import com.example.urlshortener.dto.ShortUrlResponse;
 import com.example.urlshortener.service.ShortUrlCreationResult;
 import com.example.urlshortener.service.ShortUrlService;
@@ -32,6 +33,12 @@ public class ShortUrlController {
         ShortUrlCreationResult result = shortUrlService.createShortUrl(request.originalUrl());
         HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(result.response());
+    }
+
+    @GetMapping("/api/urls/{shortCode}/analytics")
+    public ResponseEntity<ShortUrlAnalyticsResponse> getAnalytics(
+            @PathVariable String shortCode) {
+        return ResponseEntity.ok(shortUrlService.getAnalytics(shortCode));
     }
 
     @GetMapping("/{shortCode}")

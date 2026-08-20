@@ -51,6 +51,21 @@ npm run dev
 
 Open `http://localhost:5173`. If the API is hosted elsewhere, copy `.env.example` to `.env.local` and change `VITE_API_BASE_URL`. Set the matching backend `APP_ALLOWED_ORIGIN` when the frontend origin changes.
 
+If port `8080` is already occupied, start the backend and frontend with matching overrides:
+
+```powershell
+# Backend terminal
+$env:SERVER_PORT = "8081"
+$env:APP_BASE_URL = "http://localhost:8081"
+cd backend
+mvn spring-boot:run
+
+# Frontend terminal
+$env:VITE_API_BASE_URL = "http://localhost:8081"
+cd frontend
+npm run dev
+```
+
 ## API
 
 Create a short URL:
@@ -79,6 +94,50 @@ Submitting the same `originalUrl` again returns the existing mapping with `200 O
 New links expire one calendar month after creation. Their creation and initial last-access timestamps are identical. Re-submitting an existing URL atomically increments its click count and refreshes its last-access timestamp.
 
 Visiting `GET /aB12Cd` returns `302 Found` with the original URL in the `Location` header.
+
+## Access analytics
+
+After creating a short URL, the frontend displays an **Activity analytics** section. Open the short URL, return to the frontend, and select **Refresh** to retrieve the latest aggregate values.
+
+Analytics can also be read directly using the short code:
+
+```http
+GET /api/urls/aB12Cd/analytics
+```
+
+For a backend running on the default port:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/urls/aB12Cd/analytics" `
+  -Method Get
+```
+
+If the backend is running on port `8081`, use:
+
+```text
+http://localhost:8081/api/urls/aB12Cd/analytics
+```
+
+Example response:
+
+```json
+{
+  "shortCode": "aB12Cd",
+  "accessReuseCount": 7,
+  "lastRecordedActivityAt": "2026-08-20T10:37:31Z",
+  "hasRecordedActivity": true
+}
+```
+
+Analytics use the existing aggregate fields:
+
+- `accessReuseCount` comes from `click_count`. It includes successful redirects and repeated submissions of an existing original URL, so it is not a redirect-only or unique-visitor count.
+- `lastRecordedActivityAt` comes from `last_accessed_timestamp` and is returned in UTC. It is initialized to creation time; when `hasRecordedActivity` is `false`, the timestamp does not prove that a redirect or repeated submission occurred.
+- Reading analytics does not increment the count or update the timestamp.
+- Unknown, disabled, and expired short codes return the existing `404 SHORT_URL_NOT_FOUND` response.
+
+The analytics endpoint is currently unauthenticated. Anyone who knows a valid active short code can read its aggregate activity values; do not treat the endpoint as private analytics.
 
 Errors share one shape:
 

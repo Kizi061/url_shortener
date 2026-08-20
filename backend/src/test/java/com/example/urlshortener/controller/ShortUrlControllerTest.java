@@ -1,6 +1,7 @@
 package com.example.urlshortener.controller;
 
 import com.example.urlshortener.dto.ShortUrlResponse;
+import com.example.urlshortener.dto.ShortUrlAnalyticsResponse;
 import com.example.urlshortener.exception.InvalidUrlException;
 import com.example.urlshortener.exception.ShortCodeGenerationException;
 import com.example.urlshortener.exception.ShortUrlNotFoundException;
@@ -13,6 +14,8 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -76,6 +79,32 @@ class ShortUrlControllerTest {
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "https://example.com/destination"))
                 .andExpect(content().string(""));
+    }
+
+    @Test
+    void returnsAnalyticsWithTruthfulAccessReuseNames() throws Exception {
+        Instant lastActivity = Instant.parse("2026-08-20T10:37:31Z");
+        when(service.getAnalytics("aB12Cd")).thenReturn(new ShortUrlAnalyticsResponse(
+                "aB12Cd", 7, lastActivity, true));
+
+        mockMvc.perform(get("/api/urls/aB12Cd/analytics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shortCode").value("aB12Cd"))
+                .andExpect(jsonPath("$.accessReuseCount").value(7))
+                .andExpect(jsonPath("$.lastRecordedActivityAt")
+                        .value("2026-08-20T10:37:31Z"))
+                .andExpect(jsonPath("$.hasRecordedActivity").value(true))
+                .andExpect(jsonPath("$.clickCount").doesNotExist());
+    }
+
+    @Test
+    void mapsUnavailableAnalyticsCodeTo404() throws Exception {
+        when(service.getAnalytics("hidden"))
+                .thenThrow(new ShortUrlNotFoundException("hidden"));
+
+        mockMvc.perform(get("/api/urls/hidden/analytics"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"));
     }
 
     @Test

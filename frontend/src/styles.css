@@ -205,6 +205,85 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .destination span { color: #3b465d; }
 
+.analytics-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #d8e2ff;
+}
+
+.analytics-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.analytics-heading .result-label { margin-bottom: 3px; }
+
+.analytics-scope {
+  margin: 0;
+  color: #768198;
+  font-size: 0.8rem;
+}
+
+.refresh-button {
+  min-height: 36px;
+  padding: 0 14px;
+  color: #2748c1;
+  background: white;
+  border: 1px solid #bfcdf7;
+}
+
+.refresh-button:hover:not(:disabled) {
+  color: white;
+  background: #3155d9;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.metric-card {
+  min-width: 0;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid #d8e2ff;
+  border-radius: 12px;
+}
+
+.metric-card strong {
+  display: block;
+  margin-top: 6px;
+  color: #17213a;
+  font-size: 1.35rem;
+}
+
+.metric-label {
+  color: #66738c;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.metric-card .metric-time {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.analytics-note, .analytics-error {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.analytics-note { color: #657087; }
+.analytics-error { color: #8f2432; }
+
 .footer-note {
   margin: 0;
   color: #7d8799;
@@ -219,6 +298,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .form-row > button { width: 100%; }
   .short-link-row { align-items: stretch; flex-direction: column; }
   .copy-button { width: 100%; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .analytics-heading { align-items: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

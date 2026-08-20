@@ -1,4 +1,9 @@
 import { useState } from 'react'
+import {
+  activityStatus,
+  formatAccessReuseCount,
+  formatUtcTimestamp,
+} from './analytics.js'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '')
 
@@ -8,12 +13,41 @@ function App() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [analytics, setAnalytics] = useState(null)
+  const [analyticsError, setAnalyticsError] = useState('')
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false)
+
+  async function loadAnalytics(shortCode) {
+    setAnalyticsError('')
+    setIsAnalyticsLoading(true)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/urls/${encodeURIComponent(shortCode)}/analytics`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to load activity analytics.')
+      }
+
+      setAnalytics(data)
+    } catch (requestError) {
+      setAnalyticsError(
+        requestError instanceof TypeError
+          ? 'Cannot reach the URL service to load analytics.'
+          : requestError.message,
+      )
+    } finally {
+      setIsAnalyticsLoading(false)
+    }
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
     setResult(null)
     setCopied(false)
+    setAnalytics(null)
+    setAnalyticsError('')
     setIsLoading(true)
 
     try {
@@ -30,6 +64,7 @@ function App() {
 
       setResult(data)
       setOriginalUrl('')
+      await loadAnalytics(data.shortCode)
     } catch (requestError) {
       setError(
         requestError instanceof TypeError
@@ -101,6 +136,47 @@ function App() {
             <p className="destination" title={result.originalUrl}>
               Redirects to: <span>{result.originalUrl}</span>
             </p>
+
+            <section className="analytics-panel" aria-labelledby="analytics-title">
+              <div className="analytics-heading">
+                <div>
+                  <p className="result-label" id="analytics-title">Activity analytics</p>
+                  <p className="analytics-scope">Current aggregate values</p>
+                </div>
+                <button
+                  className="refresh-button"
+                  type="button"
+                  onClick={() => loadAnalytics(result.shortCode)}
+                  disabled={isAnalyticsLoading}
+                >
+                  {isAnalyticsLoading ? 'Refreshing...' : 'Refresh'}
+                </button>
+              </div>
+
+              {analytics && (
+                <>
+                  <div className="analytics-grid">
+                    <div className="metric-card">
+                      <span className="metric-label">Accesses &amp; reuses</span>
+                      <strong>{formatAccessReuseCount(analytics.accessReuseCount)}</strong>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-label">Last recorded activity</span>
+                      <strong className="metric-time">
+                        {formatUtcTimestamp(analytics.lastRecordedActivityAt)}
+                      </strong>
+                    </div>
+                  </div>
+                  <p className="analytics-note">
+                    {activityStatus(analytics.hasRecordedActivity)}
+                  </p>
+                </>
+              )}
+
+              {analyticsError && (
+                <p className="analytics-error" role="status">{analyticsError}</p>
+              )}
+            </section>
           </div>
         )}
       </section>

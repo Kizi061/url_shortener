@@ -2,6 +2,7 @@ package com.example.urlshortener.service;
 
 import com.example.urlshortener.config.UrlShortenerProperties;
 import com.example.urlshortener.domain.ShortUrl;
+import com.example.urlshortener.dto.ShortUrlAnalyticsResponse;
 import com.example.urlshortener.dto.ShortUrlResponse;
 import com.example.urlshortener.exception.ShortCodeGenerationException;
 import com.example.urlshortener.exception.ShortUrlNotFoundException;
@@ -93,6 +94,18 @@ public class ShortUrlService {
         }
 
         return shortUrl.getOriginalUrl();
+    }
+
+    public ShortUrlAnalyticsResponse getAnalytics(String shortCode) {
+        Instant readAt = Instant.now(clock);
+        ShortUrl shortUrl = repository.findRedirectCandidate(shortCode, readAt)
+                .orElseThrow(() -> new ShortUrlNotFoundException(shortCode));
+
+        return new ShortUrlAnalyticsResponse(
+                shortUrl.getShortCode(),
+                shortUrl.getClickCount(),
+                shortUrl.getLastAccessedTimestamp(),
+                shortUrl.getClickCount() > 0);
     }
 
     private Optional<ShortUrl> findExisting(String originalUrl, String originalUrlHash) {

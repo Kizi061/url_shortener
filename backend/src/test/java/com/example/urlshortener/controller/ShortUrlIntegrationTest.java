@@ -133,6 +133,52 @@ class ShortUrlIntegrationTest {
     }
 
     @Test
+    void analyticsReturnsStoredActivityWithoutMutatingIt() throws Exception {
+        Instant createdAt = Instant.parse("2026-08-19T10:00:00Z");
+        Instant lastActivity = Instant.parse("2026-08-20T10:37:31Z");
+        ShortUrl saved = repository.saveAndFlush(new ShortUrl(
+                "stats1",
+                "http://localhost:8080/stats1",
+                "https://example.com/analytics",
+                new OriginalUrlHasher().hash("https://example.com/analytics"),
+                createdAt));
+        repository.recordExistingUrlAccess(saved.getId(), lastActivity);
+
+        mockMvc.perform(get("/api/urls/stats1/analytics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shortCode").value("stats1"))
+                .andExpect(jsonPath("$.accessReuseCount").value(1))
+                .andExpect(jsonPath("$.lastRecordedActivityAt")
+                        .value("2026-08-20T10:37:31Z"))
+                .andExpect(jsonPath("$.hasRecordedActivity").value(true));
+
+        ShortUrl unchanged = repository.findByShortCode("stats1").orElseThrow();
+        assertThat(unchanged.getClickCount()).isEqualTo(1);
+        assertThat(unchanged.getLastAccessedTimestamp()).isEqualTo(lastActivity);
+    }
+
+    @Test
+    void analyticsReturns404ForDisabledLinkWithoutMutatingIt() throws Exception {
+        ShortUrl disabled = new ShortUrl(
+                "nostat",
+                "http://localhost:8080/nostat",
+                "https://example.com/disabled-analytics",
+                new OriginalUrlHasher().hash("https://example.com/disabled-analytics"),
+                Instant.now());
+        disabled.deactivate();
+        repository.saveAndFlush(disabled);
+
+        mockMvc.perform(get("/api/urls/nostat/analytics"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"));
+
+        ShortUrl unchanged = repository.findByShortCode("nostat").orElseThrow();
+        assertThat(unchanged.getClickCount()).isZero();
+        assertThat(unchanged.getLastAccessedTimestamp())
+                .isEqualTo(unchanged.getCreatedTimestamp());
+    }
+
+    @Test
     void inactiveShortCodeReturns404() throws Exception {
         ShortUrl inactive = new ShortUrl(
                 "off123",

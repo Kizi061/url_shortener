@@ -2,6 +2,7 @@ package com.example.urlshortener.service;
 
 import com.example.urlshortener.config.UrlShortenerProperties;
 import com.example.urlshortener.domain.ShortUrl;
+import com.example.urlshortener.dto.ShortUrlAnalyticsResponse;
 import com.example.urlshortener.dto.ShortUrlResponse;
 import com.example.urlshortener.exception.InvalidUrlException;
 import com.example.urlshortener.exception.ShortCodeGenerationException;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -118,6 +120,47 @@ class ShortUrlServiceTest {
 
         assertThat(service.getOriginalUrl("aB12Cd")).isEqualTo("https://example.com/page");
         verify(repository).recordSuccessfulAccess(null, NOW);
+    }
+
+    @Test
+    void returnsReadOnlyAnalyticsUsingExistingFieldSemantics() {
+        ShortUrl entity = mock(ShortUrl.class);
+        Instant lastActivity = NOW.minusSeconds(30);
+        when(entity.getShortCode()).thenReturn("aB12Cd");
+        when(entity.getClickCount()).thenReturn(7L);
+        when(entity.getLastAccessedTimestamp()).thenReturn(lastActivity);
+        when(repository.findRedirectCandidate("aB12Cd", NOW)).thenReturn(Optional.of(entity));
+
+        ShortUrlAnalyticsResponse response = service.getAnalytics("aB12Cd");
+
+        assertThat(response.shortCode()).isEqualTo("aB12Cd");
+        assertThat(response.accessReuseCount()).isEqualTo(7);
+        assertThat(response.lastRecordedActivityAt()).isEqualTo(lastActivity);
+        assertThat(response.hasRecordedActivity()).isTrue();
+        verify(repository, never()).recordSuccessfulAccess(any(), any());
+        verify(repository, never()).recordExistingUrlAccess(any(), any());
+    }
+
+    @Test
+    void reportsNoPostCreationActivityWhenCountIsZero() {
+        ShortUrl entity = mock(ShortUrl.class);
+        when(entity.getShortCode()).thenReturn("new123");
+        when(entity.getClickCount()).thenReturn(0L);
+        when(entity.getLastAccessedTimestamp()).thenReturn(NOW);
+        when(repository.findRedirectCandidate("new123", NOW)).thenReturn(Optional.of(entity));
+
+        ShortUrlAnalyticsResponse response = service.getAnalytics("new123");
+
+        assertThat(response.hasRecordedActivity()).isFalse();
+        assertThat(response.lastRecordedActivityAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void throwsNotFoundWhenAnalyticsCodeIsNotEligible() {
+        when(repository.findRedirectCandidate("hidden", NOW)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getAnalytics("hidden"))
+                .isInstanceOf(ShortUrlNotFoundException.class);
     }
 
     @Test
