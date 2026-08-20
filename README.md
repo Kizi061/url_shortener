@@ -71,6 +71,8 @@ Successful response (`201 Created`):
 }
 ```
 
+Submitting the same `originalUrl` again returns the existing mapping with `200 OK`; it does not create another database record or short code.
+
 Visiting `GET /aB12Cd` returns `302 Found` with the original URL in the `Location` header.
 
 Errors share one shape:

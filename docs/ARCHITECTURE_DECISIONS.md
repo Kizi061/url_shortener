@@ -21,6 +21,7 @@ All decisions are **Accepted** for the current application unless marked otherwi
 | ADR-009 | Centralize API error mapping | Consistent client contract and thin controllers |
 | ADR-010 | Externalize runtime addresses, credentials, and CORS origin | Keep environment-specific values outside compiled code |
 | ADR-011 | Keep the first version stateless and synchronous | Minimize operational complexity for the current workload |
+| ADR-012 | Deduplicate exact original URLs with a SHA-256 uniqueness key | Prevent duplicate mappings safely under concurrent requests |
 
 ## ADR-001: Separate React frontend and Spring Boot backend
 
@@ -335,6 +336,43 @@ Handle creation and lookup synchronously. Keep no required mapping state in appl
 - Multiple backend instances can share one MySQL database.
 - Redirect latency includes a database query.
 - Caching can be added later based on observed read traffic rather than assumed demand.
+
+## ADR-012: Deduplicate exact original URLs with a SHA-256 uniqueness key
+
+**Status:** Accepted
+
+### Context
+
+Repeated submissions of the same original URL must return the existing short code rather than create duplicate records. An application lookup alone is not sufficient because concurrent requests can both observe no existing row before either insert commits. A direct unique index on a 2,048-character `original_url` can exceed practical MySQL index-key limits.
+
+### Decision
+
+Compute a lowercase SHA-256 hexadecimal value from the exact original URL and store it in `original_url_hash` with a unique database constraint.
+
+The create flow:
+
+1. Validates the URL and computes its hash.
+2. Looks up an existing mapping by hash and verifies the original URL string.
+3. Returns the existing mapping with `200 OK` when found.
+4. Creates a new mapping with `201 Created` when absent.
+5. If a concurrent insert wins, catches the constraint violation, rereads the mapping, and returns it.
+6. Falls back to an exact original-URL query for records created before the hash column existed.
+
+### Alternatives considered
+
+- Use only `findByOriginalUrl` without a database uniqueness constraint.
+- Add a unique index directly to the full original URL column.
+- Canonicalize URLs before comparison.
+- Return a new short code for every request.
+
+### Consequences
+
+- Exact repeated URLs reuse one database record and short code.
+- Concurrent requests cannot create duplicate new mappings.
+- The 64-character hash is efficient to index compared with the full URL.
+- The original string comparison prevents a theoretical hash collision from returning an unrelated mapping.
+- URL equivalence remains deliberately conservative: variations in case, query ordering, encoding, or trailing slashes are treated as different strings.
+- The hash column remains nullable to allow Hibernate to add it to databases containing legacy rows; all newly created rows populate it.
 
 ## 3. Decision drivers
 

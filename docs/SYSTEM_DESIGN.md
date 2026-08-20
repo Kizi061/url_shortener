@@ -15,8 +15,9 @@ Implemented capabilities:
 - Responsive React interface for submitting a long URL.
 - REST endpoint for creating a short URL.
 - Validation of absolute HTTP and HTTPS URLs.
+- Reuse of an existing mapping when the exact original URL was previously shortened.
 - Six-character Base62-style code generation with `SecureRandom`.
-- Bounded collision handling and a database uniqueness constraint.
+- Bounded short-code collision handling plus database uniqueness for codes and original URLs.
 - MySQL persistence of the code, short URL, original URL, and UTC creation timestamp.
 - HTTP 302 redirect when a short code is resolved.
 - Consistent JSON error responses through global exception handling.
@@ -125,6 +126,7 @@ flowchart TB
 
 - `UrlValidator` accepts only absolute `http` and `https` URIs with a host.
 - `ShortCodeGenerator` uses `SecureRandom` and the alphabet `a-z`, `A-Z`, and `0-9`.
+- `OriginalUrlHasher` creates the fixed-width SHA-256 key used to enforce original-URL uniqueness.
 
 #### Repository layer
 
@@ -154,6 +156,7 @@ erDiagram
         VARCHAR_6 short_code UK
         VARCHAR_512 short_url
         VARCHAR_2048 original_url
+        VARCHAR_64 original_url_hash UK
         TIMESTAMP created_timestamp
     }
 ```
@@ -166,9 +169,10 @@ erDiagram
 | `short_code` | `String` | Required, length 6, unique | Public lookup key |
 | `short_url` | `String` | Required, maximum 512 | Complete public URL returned to clients |
 | `original_url` | `String` | Required, maximum 2048 | Redirect destination |
+| `original_url_hash` | `String` | SHA-256 hex, unique; nullable for legacy rows | Fixed-width uniqueness and indexed lookup key |
 | `created_timestamp` | `Instant` | Required, immutable after insert | Creation time in UTC |
 
-The unique constraint on `short_code` is the final authority for uniqueness. Hibernate currently creates or updates the schema with `ddl-auto: update`.
+The unique constraints on `short_code` and `original_url_hash` are the final authorities for uniqueness. The hash avoids an oversized MySQL index on the 2,048-character URL. The service confirms the original string after a hash lookup, so a theoretical hash collision cannot return the wrong mapping. Hibernate currently creates or updates the schema with `ddl-auto: update`.
 
 ## 7. API design
 
@@ -184,7 +188,7 @@ Request:
 }
 ```
 
-Successful response: `201 Created`
+Successful response for a new URL: `201 Created`
 
 ```json
 {
@@ -193,6 +197,8 @@ Successful response: `201 Created`
   "originalUrl": "https://www.example.com/products/category/item/12345"
 }
 ```
+
+If the exact `originalUrl` already exists, the endpoint returns the same response body and stored short code with `200 OK`. URL matching is exact; the application does not canonicalize hostname case, query ordering, trailing slashes, or other semantically debatable URL variations.
 
 ### 7.2 Resolve a short URL
 
@@ -244,8 +250,16 @@ sequenceDiagram
     Controller->>Service: createShortUrl(originalUrl)
     Service->>Validator: validate(originalUrl)
     Validator-->>Service: valid
+    Service->>Service: Compute SHA-256 URL key
+    Service->>Repo: Find existing mapping by URL key
+    Repo->>DB: SELECT existing mapping
+    alt Exact original URL already exists
+        DB-->>Service: Existing mapping
+        Service-->>Controller: Existing response, created=false
+        Controller-->>UI: 200 OK
+    else URL does not exist
 
-    loop Maximum 10 attempts
+      loop Maximum 10 attempts
         Service->>Generator: nextCode()
         Generator-->>Service: six-character code
         Service->>Repo: existsByShortCode(code)
@@ -265,12 +279,13 @@ sequenceDiagram
         else Code already exists
             Note over Service: Retry with a new code
         end
+      end
     end
 
     UI-->>User: Display and copy short URL
 ```
 
-The code space contains `62^6`, or 56,800,235,584, possible values. The preliminary existence check handles ordinary collisions; the database constraint handles concurrent races between application instances.
+The code space contains `62^6`, or 56,800,235,584, possible values. The preliminary existence checks handle normal reuse and ordinary code collisions. Database constraints handle concurrent races between application instances: if another request inserts the same original URL first, the service reads and returns that winning mapping.
 
 ### 8.2 Redirect flow
 
@@ -341,7 +356,7 @@ Current gaps for an internet-facing deployment include rate limiting, abuse dete
 
 ### Reliability and consistency
 
-- Database uniqueness guarantees that one stored code cannot represent two mappings.
+- Database uniqueness guarantees that one stored code cannot represent two mappings and that one original URL hash cannot create duplicate mappings.
 - Bounded retries prevent an infinite loop during repeated collisions.
 - UTC `Instant` values avoid server-time-zone ambiguity.
 - The application is stateless outside MySQL and can be horizontally replicated against the same database.
@@ -362,13 +377,13 @@ Current gaps for an internet-facing deployment include rate limiting, abuse dete
 
 ## 11. Test design
 
-The backend currently has 13 passing tests.
+The backend currently has 16 passing tests.
 
 | Test area | Coverage |
 |---|---|
 | Generator unit tests | Six-character alphanumeric format and varied output |
-| Service unit tests | Successful creation, invalid URL, database lookup, missing code, normal collision, concurrent insert collision, bounded retry failure |
-| API integration tests | `POST /api/urls`, invalid POST, successful `GET /{shortCode}` redirect, unknown-code 404 |
+| Service unit tests | Successful creation, existing-URL reuse, invalid URL, database lookup, missing code, normal collision, concurrent code collision, concurrent original-URL insertion, bounded retry failure |
+| API integration tests | New `POST /api/urls`, repeated POST without duplicate insertion, invalid POST, successful `GET /{shortCode}` redirect, unknown-code 404 |
 
 Integration tests run with the `test` profile and an in-memory H2 database configured in MySQL compatibility mode. The code generator is overridden in endpoint tests so assertions remain deterministic.
 

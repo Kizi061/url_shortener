@@ -22,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +43,7 @@ class ShortUrlServiceTest {
         service = new ShortUrlService(
                 repository,
                 generator,
+                new OriginalUrlHasher(),
                 new UrlValidator(),
                 new UrlShortenerProperties("http://localhost:8080", "http://localhost:5173"),
                 Clock.fixed(NOW, ZoneOffset.UTC));
@@ -55,12 +57,35 @@ class ShortUrlServiceTest {
         when(repository.saveAndFlush(any(ShortUrl.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShortUrlResponse response = service.createShortUrl(originalUrl);
+        ShortUrlCreationResult result = service.createShortUrl(originalUrl);
+        ShortUrlResponse response = result.response();
 
+        assertThat(result.created()).isTrue();
         assertThat(response.shortCode()).isEqualTo("aB12Cd");
         assertThat(response.shortUrl()).isEqualTo("http://localhost:8080/aB12Cd");
         assertThat(response.originalUrl()).isEqualTo(originalUrl);
         verify(repository).saveAndFlush(any(ShortUrl.class));
+    }
+
+    @Test
+    void returnsExistingMappingWithoutGeneratingOrSavingAnotherRecord() {
+        String originalUrl = "https://example.com/already-shortened";
+        String originalUrlHash = new OriginalUrlHasher().hash(originalUrl);
+        ShortUrl existing = new ShortUrl(
+                "old123",
+                "http://localhost:8080/old123",
+                originalUrl,
+                originalUrlHash,
+                NOW);
+        when(repository.findByOriginalUrlHash(originalUrlHash)).thenReturn(Optional.of(existing));
+
+        ShortUrlCreationResult result = service.createShortUrl(originalUrl);
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.response().shortCode()).isEqualTo("old123");
+        assertThat(result.response().shortUrl()).isEqualTo("http://localhost:8080/old123");
+        verify(generator, never()).nextCode();
+        verify(repository, never()).saveAndFlush(any(ShortUrl.class));
     }
 
     @Test
@@ -72,7 +97,11 @@ class ShortUrlServiceTest {
     @Test
     void looksUpOriginalUrlByShortCode() {
         ShortUrl entity = new ShortUrl(
-                "aB12Cd", "http://localhost:8080/aB12Cd", "https://example.com/page", NOW);
+                "aB12Cd",
+                "http://localhost:8080/aB12Cd",
+                "https://example.com/page",
+                new OriginalUrlHasher().hash("https://example.com/page"),
+                NOW);
         when(repository.findByShortCode("aB12Cd")).thenReturn(Optional.of(entity));
 
         assertThat(service.getOriginalUrl("aB12Cd")).isEqualTo("https://example.com/page");
@@ -94,7 +123,7 @@ class ShortUrlServiceTest {
         when(repository.saveAndFlush(any(ShortUrl.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShortUrlResponse response = service.createShortUrl("https://example.com");
+        ShortUrlResponse response = service.createShortUrl("https://example.com").response();
 
         assertThat(response.shortCode()).isEqualTo("fresh2");
     }
@@ -108,9 +137,33 @@ class ShortUrlServiceTest {
                 .thenThrow(new DataIntegrityViolationException("duplicate"))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        ShortUrlResponse response = service.createShortUrl("https://example.com");
+        ShortUrlResponse response = service.createShortUrl("https://example.com").response();
 
         assertThat(response.shortCode()).isEqualTo("safe02");
+    }
+
+    @Test
+    void returnsConcurrentlyCreatedMappingWhenOriginalUrlUniqueConstraintWins() {
+        String originalUrl = "https://example.com/concurrent";
+        String originalUrlHash = new OriginalUrlHasher().hash(originalUrl);
+        ShortUrl concurrentlyCreated = new ShortUrl(
+                "other1",
+                "http://localhost:8080/other1",
+                originalUrl,
+                originalUrlHash,
+                NOW);
+        when(repository.findByOriginalUrlHash(originalUrlHash))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(concurrentlyCreated));
+        when(generator.nextCode()).thenReturn("mine01");
+        when(repository.existsByShortCode("mine01")).thenReturn(false);
+        when(repository.saveAndFlush(any(ShortUrl.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate original URL"));
+
+        ShortUrlCreationResult result = service.createShortUrl(originalUrl);
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.response().shortCode()).isEqualTo("other1");
     }
 
     @Test

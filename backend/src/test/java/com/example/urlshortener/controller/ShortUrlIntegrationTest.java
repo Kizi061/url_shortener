@@ -2,6 +2,7 @@ package com.example.urlshortener.controller;
 
 import com.example.urlshortener.domain.ShortUrl;
 import com.example.urlshortener.repository.ShortUrlRepository;
+import com.example.urlshortener.service.OriginalUrlHasher;
 import com.example.urlshortener.service.ShortCodeGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,8 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -60,6 +63,30 @@ class ShortUrlIntegrationTest {
     }
 
     @Test
+    void repeatedPostReturnsExistingMappingWithoutDuplicateRecord() throws Exception {
+        when(generator.nextCode()).thenReturn("same01");
+        String request = """
+                {"originalUrl":"https://www.example.com/repeated"}
+                """;
+
+        mockMvc.perform(post("/api/urls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shortCode").value("same01"));
+
+        mockMvc.perform(post("/api/urls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shortCode").value("same01"))
+                .andExpect(jsonPath("$.shortUrl").value("http://localhost:8080/same01"));
+
+        assertThat(repository.count()).isEqualTo(1);
+        verify(generator, times(1)).nextCode();
+    }
+
+    @Test
     void postRejectsInvalidUrl() throws Exception {
         mockMvc.perform(post("/api/urls")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -75,6 +102,8 @@ class ShortUrlIntegrationTest {
                 "aB12Cd",
                 "http://localhost:8080/aB12Cd",
                 "https://www.example.com/products/category/item/12345",
+                new OriginalUrlHasher().hash(
+                        "https://www.example.com/products/category/item/12345"),
                 Instant.now()));
 
         mockMvc.perform(get("/aB12Cd"))

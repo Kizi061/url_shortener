@@ -2,6 +2,7 @@ package com.example.urlshortener.controller;
 
 import com.example.urlshortener.dto.CreateShortUrlRequest;
 import com.example.urlshortener.dto.ShortUrlResponse;
+import com.example.urlshortener.service.ShortUrlCreationResult;
 import com.example.urlshortener.service.ShortUrlService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -28,8 +29,9 @@ public class ShortUrlController {
     @PostMapping("/api/urls")
     public ResponseEntity<ShortUrlResponse> createShortUrl(
             @Valid @RequestBody CreateShortUrlRequest request) {
-        ShortUrlResponse response = shortUrlService.createShortUrl(request.originalUrl());
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        ShortUrlCreationResult result = shortUrlService.createShortUrl(request.originalUrl());
+        HttpStatus status = result.created() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(result.response());
     }
 
     @GetMapping("/{shortCode}")

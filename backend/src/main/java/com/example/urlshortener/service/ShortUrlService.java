@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 
 @Service
 public class ShortUrlService {
@@ -19,6 +20,7 @@ public class ShortUrlService {
 
     private final ShortUrlRepository repository;
     private final ShortCodeGenerator shortCodeGenerator;
+    private final OriginalUrlHasher originalUrlHasher;
     private final UrlValidator urlValidator;
     private final UrlShortenerProperties properties;
     private final Clock clock;
@@ -26,18 +28,26 @@ public class ShortUrlService {
     public ShortUrlService(
             ShortUrlRepository repository,
             ShortCodeGenerator shortCodeGenerator,
+            OriginalUrlHasher originalUrlHasher,
             UrlValidator urlValidator,
             UrlShortenerProperties properties,
             Clock clock) {
         this.repository = repository;
         this.shortCodeGenerator = shortCodeGenerator;
+        this.originalUrlHasher = originalUrlHasher;
         this.urlValidator = urlValidator;
         this.properties = properties;
         this.clock = clock;
     }
 
-    public ShortUrlResponse createShortUrl(String originalUrl) {
+    public ShortUrlCreationResult createShortUrl(String originalUrl) {
         urlValidator.validate(originalUrl);
+        String originalUrlHash = originalUrlHasher.hash(originalUrl);
+
+        Optional<ShortUrl> existing = findExisting(originalUrl, originalUrlHash);
+        if (existing.isPresent()) {
+            return new ShortUrlCreationResult(toResponse(existing.get()), false);
+        }
 
         for (int attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
             String shortCode = shortCodeGenerator.nextCode();
@@ -50,13 +60,18 @@ public class ShortUrlService {
                     shortCode,
                     shortUrlValue,
                     originalUrl,
+                    originalUrlHash,
                     Instant.now(clock));
 
             try {
                 ShortUrl saved = repository.saveAndFlush(entity);
-                return toResponse(saved);
+                return new ShortUrlCreationResult(toResponse(saved), true);
             } catch (DataIntegrityViolationException exception) {
-                // A concurrent request may have persisted the same generated code.
+                Optional<ShortUrl> concurrentlyCreated = findExisting(originalUrl, originalUrlHash);
+                if (concurrentlyCreated.isPresent()) {
+                    return new ShortUrlCreationResult(toResponse(concurrentlyCreated.get()), false);
+                }
+                // Otherwise, a concurrent request may have persisted the same short code.
             }
         }
 
@@ -67,6 +82,17 @@ public class ShortUrlService {
         return repository.findByShortCode(shortCode)
                 .map(ShortUrl::getOriginalUrl)
                 .orElseThrow(() -> new ShortUrlNotFoundException(shortCode));
+    }
+
+    private Optional<ShortUrl> findExisting(String originalUrl, String originalUrlHash) {
+        Optional<ShortUrl> byHash = repository.findByOriginalUrlHash(originalUrlHash)
+                .filter(shortUrl -> originalUrl.equals(shortUrl.getOriginalUrl()));
+        if (byHash.isPresent()) {
+            return byHash;
+        }
+
+        // Supports records created before the original_url_hash column was introduced.
+        return repository.findByOriginalUrl(originalUrl);
     }
 
     private ShortUrlResponse toResponse(ShortUrl entity) {

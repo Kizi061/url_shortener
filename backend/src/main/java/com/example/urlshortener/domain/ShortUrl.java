@@ -12,7 +12,8 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "short_urls", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_short_urls_short_code", columnNames = "short_code")
+        @UniqueConstraint(name = "uk_short_urls_short_code", columnNames = "short_code"),
+        @UniqueConstraint(name = "uk_short_urls_original_url_hash", columnNames = "original_url_hash")
 })
 public class ShortUrl {
 
@@ -29,16 +30,25 @@ public class ShortUrl {
     @Column(name = "original_url", nullable = false, length = 2048)
     private String originalUrl;
 
+    @Column(name = "original_url_hash", length = 64, unique = true)
+    private String originalUrlHash;
+
     @Column(name = "created_timestamp", nullable = false, updatable = false)
     private Instant createdTimestamp;
 
     protected ShortUrl() {
     }
 
-    public ShortUrl(String shortCode, String shortUrl, String originalUrl, Instant createdTimestamp) {
+    public ShortUrl(
+            String shortCode,
+            String shortUrl,
+            String originalUrl,
+            String originalUrlHash,
+            Instant createdTimestamp) {
         this.shortCode = shortCode;
         this.shortUrl = shortUrl;
         this.originalUrl = originalUrl;
+        this.originalUrlHash = originalUrlHash;
         this.createdTimestamp = createdTimestamp;
     }
 
@@ -56,6 +66,10 @@ public class ShortUrl {
 
     public String getOriginalUrl() {
         return originalUrl;
+    }
+
+    public String getOriginalUrlHash() {
+        return originalUrlHash;
     }
 
     public Instant getCreatedTimestamp() {
