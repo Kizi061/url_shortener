@@ -1,0 +1,54 @@
+flowchart TB
+    R[Requirement Analysis]
+    RG{Requirement Gate}
+
+    A[Architecture]
+    P[Planning]
+    DS((Design Sync))
+    DA{Human Design Approval}
+
+    I[Implementation]
+
+    U[Unit Tests]
+    S[Security Validation]
+    D[Documentation]
+    IT[Integration Tests]
+    ES((Evidence Sync))
+
+    V[Acceptance Validation]
+    Q{Quality Gate}
+    RR[Release Readiness]
+    HA{Human Release Approval}
+    C([COMPLETE])
+
+    R --> RG
+    RG --> A
+    RG --> P
+    A --> DS
+    P --> DS
+    DS --> DA
+    DA --> I
+
+    I --> U
+    I --> S
+    I --> D
+    U --> IT
+
+    IT --> ES
+    S --> ES
+    D --> ES
+    ES --> V
+    V --> Q
+    Q --> RR
+    RR --> HA
+    HA --> C
+
+    classDef work fill:#e8f1ff,stroke:#2563eb,color:#172554
+    classDef gate fill:#fff4cc,stroke:#b7791f,color:#5f370e
+    classDef sync fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef terminal fill:#dcfce7,stroke:#15803d,color:#14532d
+
+    class R,A,P,I,U,S,D,IT,V,RR work
+    class RG,DA,Q,HA gate
+    class DS,ES sync
+    class C terminal

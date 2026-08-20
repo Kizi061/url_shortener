@@ -1,0 +1,576 @@
+{
+  "schemaVersion": "1.0.0",
+  "workflowId": "wf-url-shortener-20260820-001",
+  "stateRevision": 17,
+  "status": "WAITING_APPROVAL",
+  "pauseReason": "Implementation requires architecture and plan approval.",
+  "requirement": {
+    "currentVersion": 2,
+    "versions": [
+      {
+        "version": 1,
+        "supersedesVersion": null,
+        "contentHash": "sha256:requirement-v1",
+        "source": "assessment-pdf",
+        "summary": "Build an agentic URL shortener.",
+        "artifactId": null,
+        "changeReason": null,
+        "createdAt": "2026-08-20T14:00:00Z",
+        "createdBy": {
+          "type": "HUMAN",
+          "id": "requester",
+          "role": "PRODUCT_OWNER"
+        }
+      },
+      {
+        "version": 2,
+        "supersedesVersion": 1,
+        "contentHash": "sha256:requirement-v2",
+        "source": "human-clarification",
+        "summary": "Add duplicate prevention, expiration, and URL access counting.",
+        "artifactId": "artifact-requirements-v2",
+        "changeReason": "Lifecycle and analytics behavior was clarified.",
+        "createdAt": "2026-08-20T15:00:00Z",
+        "createdBy": {
+          "type": "HUMAN",
+          "id": "requester",
+          "role": "PRODUCT_OWNER"
+        }
+      }
+    ]
+  },
+  "taskGraph": {
+    "version": 2,
+    "entryTaskIds": ["REQ-2"],
+    "terminalTaskIds": ["RELEASE-2"],
+    "tasks": {
+      "ARCH-1": {
+        "taskId": "ARCH-1",
+        "planVersion": 1,
+        "stage": "ARCHITECTURE",
+        "name": "Design initial URL-shortener architecture",
+        "description": "Historical architecture based on requirement version 1.",
+        "assignedAgent": "ArchitectureAgent",
+        "status": "INVALIDATED",
+        "dependencies": [],
+        "inputArtifactIds": [],
+        "outputArtifactIds": ["artifact-architecture-v1"],
+        "requiredApprovalIds": [],
+        "attemptCount": 1,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:ARCH-1:v1",
+        "checkpointId": "checkpoint-008",
+        "lease": null,
+        "startedAt": "2026-08-20T14:10:00Z",
+        "completedAt": "2026-08-20T14:20:00Z",
+        "createdAt": "2026-08-20T14:05:00Z",
+        "updatedAt": "2026-08-20T15:05:00Z"
+      },
+      "REQ-2": {
+        "taskId": "REQ-2",
+        "planVersion": 2,
+        "stage": "REQUIREMENT_ANALYSIS",
+        "name": "Normalize requirement version 2",
+        "description": "Resolve duplicate, lifecycle, and analytics semantics.",
+        "assignedAgent": "RequirementAgent",
+        "status": "SUCCEEDED",
+        "dependencies": [],
+        "inputArtifactIds": [],
+        "outputArtifactIds": ["artifact-requirements-v2"],
+        "requiredApprovalIds": [],
+        "attemptCount": 1,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:REQ-2:v2",
+        "checkpointId": "checkpoint-014",
+        "lease": null,
+        "startedAt": "2026-08-20T15:01:00Z",
+        "completedAt": "2026-08-20T15:04:00Z",
+        "createdAt": "2026-08-20T15:00:30Z",
+        "updatedAt": "2026-08-20T15:04:00Z"
+      },
+      "ARCH-2": {
+        "taskId": "ARCH-2",
+        "planVersion": 2,
+        "stage": "ARCHITECTURE",
+        "name": "Revise architecture for lifecycle and metrics",
+        "description": "Add schema evolution, guarded redirects, and atomic counting.",
+        "assignedAgent": "ArchitectureAgent",
+        "status": "SUCCEEDED",
+        "dependencies": [
+          {
+            "taskId": "REQ-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": ["artifact-requirements-v2"]
+          }
+        ],
+        "inputArtifactIds": ["artifact-requirements-v2"],
+        "outputArtifactIds": ["artifact-architecture-v2"],
+        "requiredApprovalIds": [],
+        "attemptCount": 2,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:ARCH-2:v2",
+        "checkpointId": "checkpoint-016",
+        "lease": null,
+        "startedAt": "2026-08-20T15:06:00Z",
+        "completedAt": "2026-08-20T15:15:00Z",
+        "createdAt": "2026-08-20T15:05:00Z",
+        "updatedAt": "2026-08-20T15:15:00Z"
+      },
+      "PLAN-2": {
+        "taskId": "PLAN-2",
+        "planVersion": 2,
+        "stage": "PLANNING",
+        "name": "Plan implementation version 2",
+        "description": "Create dependency-aware implementation tasks.",
+        "assignedAgent": "PlannerAgent",
+        "status": "SUCCEEDED",
+        "dependencies": [
+          {
+            "taskId": "ARCH-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": ["artifact-architecture-v2"]
+          }
+        ],
+        "inputArtifactIds": ["artifact-architecture-v2"],
+        "outputArtifactIds": ["artifact-plan-v2"],
+        "requiredApprovalIds": [],
+        "attemptCount": 1,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:PLAN-2:v2",
+        "checkpointId": "checkpoint-017",
+        "lease": null,
+        "startedAt": "2026-08-20T15:16:00Z",
+        "completedAt": "2026-08-20T15:20:00Z",
+        "createdAt": "2026-08-20T15:15:00Z",
+        "updatedAt": "2026-08-20T15:20:00Z"
+      },
+      "IMPL-2": {
+        "taskId": "IMPL-2",
+        "planVersion": 2,
+        "stage": "IMPLEMENTATION",
+        "name": "Implement approved lifecycle changes",
+        "description": "Modify the model, migrations, repository, and service.",
+        "assignedAgent": "ImplementationAgent",
+        "status": "WAITING_APPROVAL",
+        "dependencies": [
+          {
+            "taskId": "PLAN-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": ["artifact-plan-v2"]
+          }
+        ],
+        "inputArtifactIds": [
+          "artifact-requirements-v2",
+          "artifact-architecture-v2",
+          "artifact-plan-v2"
+        ],
+        "outputArtifactIds": [],
+        "requiredApprovalIds": ["approval-implementation-v2"],
+        "attemptCount": 0,
+        "maxAttempts": 3,
+        "idempotencyKey": "wf-001:IMPL-2:v2",
+        "checkpointId": "checkpoint-017",
+        "lease": null,
+        "startedAt": null,
+        "completedAt": null,
+        "createdAt": "2026-08-20T15:20:00Z",
+        "updatedAt": "2026-08-20T15:21:00Z"
+      },
+      "TEST-2": {
+        "taskId": "TEST-2",
+        "planVersion": 2,
+        "stage": "TESTING",
+        "name": "Run unit and integration tests",
+        "description": "Validate lifecycle, collision, and concurrency behavior.",
+        "assignedAgent": "TestAgent",
+        "status": "PLANNED",
+        "dependencies": [
+          {
+            "taskId": "IMPL-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": []
+          }
+        ],
+        "inputArtifactIds": [],
+        "outputArtifactIds": [],
+        "requiredApprovalIds": [],
+        "attemptCount": 0,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:TEST-2:v2",
+        "checkpointId": null,
+        "lease": null,
+        "startedAt": null,
+        "completedAt": null,
+        "createdAt": "2026-08-20T15:20:00Z",
+        "updatedAt": "2026-08-20T15:20:00Z"
+      },
+      "VALIDATE-2": {
+        "taskId": "VALIDATE-2",
+        "planVersion": 2,
+        "stage": "VALIDATION",
+        "name": "Validate acceptance criteria",
+        "description": "Evaluate implementation and test evidence.",
+        "assignedAgent": "ValidationAgent",
+        "status": "PLANNED",
+        "dependencies": [
+          {
+            "taskId": "TEST-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": []
+          }
+        ],
+        "inputArtifactIds": [],
+        "outputArtifactIds": [],
+        "requiredApprovalIds": [],
+        "attemptCount": 0,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:VALIDATE-2:v2",
+        "checkpointId": null,
+        "lease": null,
+        "startedAt": null,
+        "completedAt": null,
+        "createdAt": "2026-08-20T15:20:00Z",
+        "updatedAt": "2026-08-20T15:20:00Z"
+      },
+      "DOC-2": {
+        "taskId": "DOC-2",
+        "planVersion": 2,
+        "stage": "DOCUMENTATION",
+        "name": "Update engineering documentation",
+        "description": "Update requirements, architecture, database, and operations documentation.",
+        "assignedAgent": "DocumentationAgent",
+        "status": "PLANNED",
+        "dependencies": [
+          {
+            "taskId": "VALIDATE-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": []
+          }
+        ],
+        "inputArtifactIds": [],
+        "outputArtifactIds": [],
+        "requiredApprovalIds": [],
+        "attemptCount": 0,
+        "maxAttempts": 2,
+        "idempotencyKey": "wf-001:DOC-2:v2",
+        "checkpointId": null,
+        "lease": null,
+        "startedAt": null,
+        "completedAt": null,
+        "createdAt": "2026-08-20T15:20:00Z",
+        "updatedAt": "2026-08-20T15:20:00Z"
+      },
+      "RELEASE-2": {
+        "taskId": "RELEASE-2",
+        "planVersion": 2,
+        "stage": "RELEASE_READINESS",
+        "name": "Assess release readiness",
+        "description": "Review evidence, risks, approvals, and rollback readiness.",
+        "assignedAgent": "ReleaseAgent",
+        "status": "PLANNED",
+        "dependencies": [
+          {
+            "taskId": "DOC-2",
+            "requiredStatus": "SUCCEEDED",
+            "requiredArtifactIds": []
+          }
+        ],
+        "inputArtifactIds": [],
+        "outputArtifactIds": [],
+        "requiredApprovalIds": ["approval-release-v2"],
+        "attemptCount": 0,
+        "maxAttempts": 1,
+        "idempotencyKey": "wf-001:RELEASE-2:v2",
+        "checkpointId": null,
+        "lease": null,
+        "startedAt": null,
+        "completedAt": null,
+        "createdAt": "2026-08-20T15:20:00Z",
+        "updatedAt": "2026-08-20T15:20:00Z"
+      }
+    }
+  },
+  "artifacts": {
+    "artifact-architecture-v1": {
+      "artifactId": "artifact-architecture-v1",
+      "type": "ARCHITECTURE",
+      "uri": "artifact://architecture/v1",
+      "contentHash": "sha256:architecture-v1",
+      "producerTaskId": "ARCH-1",
+      "requirementVersion": 1,
+      "planVersion": 1,
+      "status": "STALE",
+      "supersedesArtifactId": null,
+      "createdAt": "2026-08-20T14:20:00Z"
+    },
+    "artifact-requirements-v2": {
+      "artifactId": "artifact-requirements-v2",
+      "type": "REQUIREMENTS",
+      "uri": "artifact://requirements/v2",
+      "contentHash": "sha256:requirement-v2",
+      "producerTaskId": "REQ-2",
+      "requirementVersion": 2,
+      "planVersion": 2,
+      "status": "CURRENT",
+      "supersedesArtifactId": null,
+      "createdAt": "2026-08-20T15:04:00Z"
+    },
+    "artifact-architecture-v2": {
+      "artifactId": "artifact-architecture-v2",
+      "type": "ARCHITECTURE",
+      "uri": "artifact://architecture/v2",
+      "contentHash": "sha256:architecture-v2",
+      "producerTaskId": "ARCH-2",
+      "requirementVersion": 2,
+      "planVersion": 2,
+      "status": "CURRENT",
+      "supersedesArtifactId": "artifact-architecture-v1",
+      "createdAt": "2026-08-20T15:15:00Z"
+    },
+    "artifact-plan-v2": {
+      "artifactId": "artifact-plan-v2",
+      "type": "PLAN",
+      "uri": "artifact://plans/v2",
+      "contentHash": "sha256:plan-v2",
+      "producerTaskId": "PLAN-2",
+      "requirementVersion": 2,
+      "planVersion": 2,
+      "status": "CURRENT",
+      "supersedesArtifactId": null,
+      "createdAt": "2026-08-20T15:20:00Z"
+    }
+  },
+  "changedFiles": [
+    {
+      "path": "docs/SYSTEM_DESIGN.md",
+      "operation": "MODIFY",
+      "previousPath": null,
+      "taskId": "ARCH-2",
+      "artifactId": "artifact-architecture-v2",
+      "beforeHash": "sha256:system-design-v1",
+      "afterHash": "sha256:system-design-v2",
+      "rollbackArtifactId": "artifact-architecture-v1",
+      "recordedAt": "2026-08-20T15:15:00Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decisionId": "decision-004",
+      "question": "How should duplicate original URLs be identified?",
+      "optionsConsidered": [
+        "Index the complete URL",
+        "Use a SHA-256 lookup key",
+        "Allow duplicate mappings"
+      ],
+      "selectedOption": "Use SHA-256 and confirm exact string equality.",
+      "rationale": "This provides a fixed-width index without returning the wrong URL on a theoretical hash collision.",
+      "madeBy": {
+        "type": "AGENT",
+        "id": "ArchitectureAgent",
+        "role": "ARCHITECT"
+      },
+      "requirementVersion": 2,
+      "planVersion": 2,
+      "affectedTaskIds": ["ARCH-2", "IMPL-2", "TEST-2"],
+      "supersedesDecisionId": null,
+      "madeAt": "2026-08-20T15:12:00Z"
+    }
+  ],
+  "risks": [
+    {
+      "riskId": "risk-007",
+      "description": "Existing database rows do not contain lifecycle timestamps.",
+      "probability": "HIGH",
+      "impact": "HIGH",
+      "status": "MITIGATED",
+      "owner": {
+        "type": "AGENT",
+        "id": "ArchitectureAgent",
+        "role": "ARCHITECT"
+      },
+      "mitigation": "Add nullable columns, backfill from creation time, and then enforce non-null constraints.",
+      "contingency": "Stop before deployment and restore the pre-migration checkpoint.",
+      "relatedTaskIds": ["ARCH-2", "IMPL-2", "TEST-2"],
+      "identifiedAt": "2026-08-20T15:08:00Z",
+      "updatedAt": "2026-08-20T15:15:00Z"
+    }
+  ],
+  "testResults": [],
+  "validationResults": [
+    {
+      "validationId": "validation-architecture-v2",
+      "taskId": "ARCH-2",
+      "gate": "ARCHITECTURE_COMPLETE",
+      "result": "PASSED",
+      "criteria": [
+        {
+          "criterion": "Schema evolution preserves existing rows.",
+          "result": "PASSED",
+          "evidenceArtifactId": "artifact-architecture-v2"
+        }
+      ],
+      "blockingFailureIds": [],
+      "validatedAt": "2026-08-20T15:16:00Z"
+    }
+  ],
+  "retries": [
+    {
+      "retryId": "retry-001",
+      "taskId": "ARCH-2",
+      "attempt": 2,
+      "failureId": "failure-001",
+      "strategy": "FIXED_BACKOFF",
+      "delaySeconds": 5,
+      "scheduledAt": "2026-08-20T15:10:00Z",
+      "startedAt": "2026-08-20T15:10:05Z",
+      "completedAt": "2026-08-20T15:15:00Z",
+      "outcome": "SUCCEEDED"
+    }
+  ],
+  "failures": [
+    {
+      "failureId": "failure-001",
+      "taskId": "ARCH-2",
+      "attempt": 1,
+      "category": "VALIDATION",
+      "message": "The initial migration plan did not describe legacy-row backfill.",
+      "retriable": true,
+      "status": "RESOLVED",
+      "detailsArtifactId": "artifact-architecture-v1",
+      "occurredAt": "2026-08-20T15:09:00Z",
+      "resolvedAt": "2026-08-20T15:15:00Z"
+    }
+  ],
+  "approvals": [
+    {
+      "approvalId": "approval-implementation-v2",
+      "gate": "IMPLEMENTATION_ENTRY",
+      "scope": {
+        "taskIds": ["IMPL-2"],
+        "artifactIds": ["artifact-architecture-v2", "artifact-plan-v2"],
+        "action": "Authorize application and database migration changes."
+      },
+      "requiredRoles": ["HUMAN_REVIEWER"],
+      "status": "REQUESTED",
+      "requestedAt": "2026-08-20T15:21:00Z",
+      "expiresAt": "2026-08-21T15:21:00Z",
+      "responses": []
+    },
+    {
+      "approvalId": "approval-release-v2",
+      "gate": "RELEASE_ENTRY",
+      "scope": {
+        "taskIds": ["RELEASE-2"],
+        "artifactIds": [],
+        "action": "Authorize release after all validation evidence is available."
+      },
+      "requiredRoles": ["RELEASE_OWNER"],
+      "status": "REQUESTED",
+      "requestedAt": "2026-08-20T15:21:00Z",
+      "expiresAt": null,
+      "responses": []
+    }
+  ],
+  "rollbacks": [
+    {
+      "rollbackId": "rollback-plan-002",
+      "trigger": "Implementation or migration validation failure",
+      "status": "PLANNED",
+      "checkpointId": "checkpoint-017",
+      "affectedTaskIds": ["IMPL-2"],
+      "actions": [
+        {
+          "actionId": "rollback-action-001",
+          "type": "RESTORE_FILE",
+          "target": "workspace files changed by IMPL-2",
+          "status": "PLANNED",
+          "idempotencyKey": "wf-001:rollback:IMPL-2:files"
+        }
+      ],
+      "createdAt": "2026-08-20T15:20:00Z",
+      "completedAt": null
+    }
+  ],
+  "replanHistory": [
+    {
+      "replanId": "replan-002",
+      "fromPlanVersion": 1,
+      "toPlanVersion": 2,
+      "trigger": "REQUIREMENT_CHANGED",
+      "requirementVersion": 2,
+      "changeSummary": "Added duplicate prevention, expiration, and URL access metrics.",
+      "addedTaskIds": [
+        "REQ-2",
+        "ARCH-2",
+        "PLAN-2",
+        "IMPL-2",
+        "TEST-2",
+        "VALIDATE-2",
+        "DOC-2",
+        "RELEASE-2"
+      ],
+      "invalidatedTaskIds": ["ARCH-1"],
+      "preservedTaskIds": [],
+      "staleArtifactIds": ["artifact-architecture-v1"],
+      "approvalId": null,
+      "createdAt": "2026-08-20T15:05:00Z"
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpointId": "checkpoint-014",
+      "stateRevision": 14,
+      "taskGraphVersion": 2,
+      "snapshotUri": "state://wf-url-shortener-20260820-001/checkpoints/14",
+      "snapshotHash": "sha256:checkpoint-014",
+      "resumableTaskIds": ["ARCH-2"],
+      "reason": "Requirement version 2 was normalized.",
+      "createdAt": "2026-08-20T15:04:30Z"
+    },
+    {
+      "checkpointId": "checkpoint-016",
+      "stateRevision": 16,
+      "taskGraphVersion": 2,
+      "snapshotUri": "state://wf-url-shortener-20260820-001/checkpoints/16",
+      "snapshotHash": "sha256:checkpoint-016",
+      "resumableTaskIds": ["PLAN-2"],
+      "reason": "Architecture version 2 passed its exit gate.",
+      "createdAt": "2026-08-20T15:16:00Z"
+    },
+    {
+      "checkpointId": "checkpoint-017",
+      "stateRevision": 17,
+      "taskGraphVersion": 2,
+      "snapshotUri": "state://wf-url-shortener-20260820-001/checkpoints/17",
+      "snapshotHash": "sha256:checkpoint-017",
+      "resumableTaskIds": ["IMPL-2"],
+      "reason": "Workflow paused at the implementation approval gate.",
+      "createdAt": "2026-08-20T15:21:00Z"
+    }
+  ],
+  "audit": {
+    "createdAt": "2026-08-20T14:00:00Z",
+    "updatedAt": "2026-08-20T15:21:00Z",
+    "lastCheckpointAt": "2026-08-20T15:21:00Z",
+    "events": [
+      {
+        "eventId": "event-017",
+        "sequence": 17,
+        "timestamp": "2026-08-20T15:21:00Z",
+        "actor": {
+          "type": "SYSTEM",
+          "id": "workflow-engine",
+          "role": "ORCHESTRATOR"
+        },
+        "action": "APPROVAL_REQUESTED",
+        "entityType": "approval",
+        "entityId": "approval-implementation-v2",
+        "stateRevision": 17,
+        "correlationId": "wf-url-shortener-20260820-001",
+        "causationEventId": "event-016",
+        "payloadHash": "sha256:event-017",
+        "previousEventHash": "sha256:event-016"
+      }
+    ]
+  }
+}

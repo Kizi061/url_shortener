@@ -1,0 +1,1220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/sdlc-workflow-state.schema.json",
+  "title": "SDLC Orchestration Workflow State",
+  "description": "Durable, versioned state shared by agents across the software-delivery lifecycle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "workflowId",
+    "stateRevision",
+    "status",
+    "requirement",
+    "taskGraph",
+    "artifacts",
+    "changedFiles",
+    "decisions",
+    "risks",
+    "testResults",
+    "validationResults",
+    "retries",
+    "failures",
+    "approvals",
+    "rollbacks",
+    "replanHistory",
+    "checkpoints",
+    "audit"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "workflowId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stateRevision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "$ref": "#/$defs/workflowStatus"
+    },
+    "pauseReason": {
+      "type": ["string", "null"]
+    },
+    "requirement": {
+      "$ref": "#/$defs/requirement"
+    },
+    "taskGraph": {
+      "$ref": "#/$defs/taskGraph"
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "changedFiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/changedFile"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/risk"
+      }
+    },
+    "testResults": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/testResult"
+      }
+    },
+    "validationResults": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/validationResult"
+      }
+    },
+    "retries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/retry"
+      }
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/failure"
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/approval"
+      }
+    },
+    "rollbacks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rollback"
+      }
+    },
+    "replanHistory": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/replan"
+      }
+    },
+    "checkpoints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/checkpoint"
+      }
+    },
+    "audit": {
+      "$ref": "#/$defs/audit"
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableTimestamp": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "workflowStatus": {
+      "enum": [
+        "DRAFT",
+        "RUNNING",
+        "WAITING_APPROVAL",
+        "PAUSED",
+        "REPLANNING",
+        "ROLLING_BACK",
+        "SAFE_STOPPED",
+        "FAILED",
+        "COMPLETED",
+        "CANCELLED"
+      ]
+    },
+    "stage": {
+      "enum": [
+        "REQUIREMENT_ANALYSIS",
+        "ARCHITECTURE",
+        "PLANNING",
+        "IMPLEMENTATION",
+        "TESTING",
+        "VALIDATION",
+        "DOCUMENTATION",
+        "RELEASE_READINESS"
+      ]
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "enum": ["AGENT", "HUMAN", "SYSTEM"]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentVersion", "versions"],
+      "properties": {
+        "currentVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/requirementVersion"
+          }
+        }
+      }
+    },
+    "requirementVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "contentHash",
+        "source",
+        "summary",
+        "createdAt",
+        "createdBy"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supersedesVersion": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "artifactId": {
+          "type": ["string", "null"]
+        },
+        "changeReason": {
+          "type": ["string", "null"]
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "createdBy": {
+          "$ref": "#/$defs/actor"
+        }
+      }
+    },
+    "taskGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "entryTaskIds", "terminalTaskIds", "tasks"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "entryTaskIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "terminalTaskIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "tasks": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/task"
+          }
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "planVersion",
+        "stage",
+        "name",
+        "status",
+        "dependencies",
+        "inputArtifactIds",
+        "outputArtifactIds",
+        "requiredApprovalIds",
+        "attemptCount",
+        "maxAttempts",
+        "idempotencyKey",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "planVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stage": {
+          "$ref": "#/$defs/stage"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "assignedAgent": {
+          "type": ["string", "null"]
+        },
+        "status": {
+          "enum": [
+            "PLANNED",
+            "READY",
+            "RUNNING",
+            "WAITING_APPROVAL",
+            "SUCCEEDED",
+            "FAILED",
+            "RETRYING",
+            "BLOCKED",
+            "SKIPPED",
+            "INVALIDATED",
+            "ROLLED_BACK",
+            "CANCELLED"
+          ]
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependency"
+          }
+        },
+        "inputArtifactIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outputArtifactIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requiredApprovalIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "attemptCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checkpointId": {
+          "type": ["string", "null"]
+        },
+        "lease": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/lease"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "requiredStatus", "requiredArtifactIds"],
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "requiredStatus": {
+          "enum": ["SUCCEEDED", "APPROVED", "COMPLETED"]
+        },
+        "requiredArtifactIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "acquiredAt", "heartbeatAt", "expiresAt"],
+      "properties": {
+        "owner": {
+          "type": "string"
+        },
+        "acquiredAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "heartbeatAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "type",
+        "uri",
+        "contentHash",
+        "producerTaskId",
+        "requirementVersion",
+        "planVersion",
+        "status",
+        "createdAt"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "REQUIREMENTS",
+            "PLAN",
+            "ARCHITECTURE",
+            "SOURCE_CODE",
+            "SCHEMA",
+            "TEST_REPORT",
+            "VALIDATION_REPORT",
+            "DOCUMENTATION",
+            "RELEASE_MANIFEST",
+            "OTHER"
+          ]
+        },
+        "uri": {
+          "type": "string"
+        },
+        "contentHash": {
+          "type": "string"
+        },
+        "producerTaskId": {
+          "type": "string"
+        },
+        "requirementVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "planVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": ["CURRENT", "STALE", "SUPERSEDED", "ROLLED_BACK"]
+        },
+        "supersedesArtifactId": {
+          "type": ["string", "null"]
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "changedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "operation",
+        "taskId",
+        "beforeHash",
+        "afterHash",
+        "recordedAt"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "operation": {
+          "enum": ["CREATE", "MODIFY", "DELETE", "RENAME"]
+        },
+        "previousPath": {
+          "type": ["string", "null"]
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "artifactId": {
+          "type": ["string", "null"]
+        },
+        "beforeHash": {
+          "type": ["string", "null"]
+        },
+        "afterHash": {
+          "type": ["string", "null"]
+        },
+        "rollbackArtifactId": {
+          "type": ["string", "null"]
+        },
+        "recordedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionId",
+        "question",
+        "optionsConsidered",
+        "selectedOption",
+        "rationale",
+        "madeBy",
+        "requirementVersion",
+        "planVersion",
+        "affectedTaskIds",
+        "madeAt"
+      ],
+      "properties": {
+        "decisionId": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "optionsConsidered": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "selectedOption": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "madeBy": {
+          "$ref": "#/$defs/actor"
+        },
+        "requirementVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "planVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "affectedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supersedesDecisionId": {
+          "type": ["string", "null"]
+        },
+        "madeAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "riskId",
+        "description",
+        "probability",
+        "impact",
+        "status",
+        "owner",
+        "relatedTaskIds",
+        "identifiedAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "riskId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "probability": {
+          "enum": ["LOW", "MEDIUM", "HIGH"]
+        },
+        "impact": {
+          "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        },
+        "status": {
+          "enum": ["OPEN", "MITIGATED", "ACCEPTED", "REALIZED", "CLOSED"]
+        },
+        "owner": {
+          "$ref": "#/$defs/actor"
+        },
+        "mitigation": {
+          "type": ["string", "null"]
+        },
+        "contingency": {
+          "type": ["string", "null"]
+        },
+        "relatedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "identifiedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "testResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "testRunId",
+        "taskId",
+        "suite",
+        "status",
+        "total",
+        "passed",
+        "failed",
+        "skipped",
+        "failureIds",
+        "startedAt",
+        "completedAt"
+      ],
+      "properties": {
+        "testRunId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "suite": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["PASSED", "FAILED", "ERROR", "CANCELLED"]
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "artifactId": {
+          "type": ["string", "null"]
+        },
+        "failureIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "validationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validationId",
+        "taskId",
+        "gate",
+        "result",
+        "criteria",
+        "blockingFailureIds",
+        "validatedAt"
+      ],
+      "properties": {
+        "validationId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "gate": {
+          "type": "string"
+        },
+        "result": {
+          "enum": ["PASSED", "FAILED", "WAIVED", "PENDING"]
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["criterion", "result"],
+            "properties": {
+              "criterion": {
+                "type": "string"
+              },
+              "result": {
+                "enum": ["PASSED", "FAILED", "NOT_RUN"]
+              },
+              "evidenceArtifactId": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "blockingFailureIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validatedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retryId",
+        "taskId",
+        "attempt",
+        "failureId",
+        "strategy",
+        "scheduledAt",
+        "outcome"
+      ],
+      "properties": {
+        "retryId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "failureId": {
+          "type": "string"
+        },
+        "strategy": {
+          "enum": ["IMMEDIATE", "FIXED_BACKOFF", "EXPONENTIAL_BACKOFF", "FALLBACK"]
+        },
+        "delaySeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scheduledAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "startedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "outcome": {
+          "enum": ["SCHEDULED", "SUCCEEDED", "FAILED", "CANCELLED"]
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "failureId",
+        "taskId",
+        "attempt",
+        "category",
+        "message",
+        "retriable",
+        "status",
+        "occurredAt"
+      ],
+      "properties": {
+        "failureId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "category": {
+          "enum": [
+            "VALIDATION",
+            "POLICY",
+            "DEPENDENCY",
+            "TOOL",
+            "TEST",
+            "TIMEOUT",
+            "CONFLICT",
+            "INFRASTRUCTURE",
+            "UNKNOWN"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": ["OPEN", "RETRYING", "RESOLVED", "ACCEPTED", "ESCALATED"]
+        },
+        "detailsArtifactId": {
+          "type": ["string", "null"]
+        },
+        "occurredAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "resolvedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approvalId",
+        "gate",
+        "scope",
+        "requiredRoles",
+        "status",
+        "requestedAt",
+        "responses"
+      ],
+      "properties": {
+        "approvalId": {
+          "type": "string"
+        },
+        "gate": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["taskIds", "artifactIds", "action"],
+          "properties": {
+            "taskIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "artifactIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "action": {
+              "type": "string"
+            }
+          }
+        },
+        "requiredRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "enum": ["REQUESTED", "APPROVED", "REJECTED", "EXPIRED", "REVOKED"]
+        },
+        "requestedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "responses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approvalResponse"
+          }
+        }
+      }
+    },
+    "approvalResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor", "decision", "decidedAt"],
+      "properties": {
+        "actor": {
+          "$ref": "#/$defs/actor"
+        },
+        "decision": {
+          "enum": ["APPROVE", "REJECT"]
+        },
+        "rationale": {
+          "type": ["string", "null"]
+        },
+        "decidedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rollbackId",
+        "trigger",
+        "status",
+        "affectedTaskIds",
+        "actions",
+        "createdAt"
+      ],
+      "properties": {
+        "rollbackId": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["PLANNED", "APPROVED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]
+        },
+        "checkpointId": {
+          "type": ["string", "null"]
+        },
+        "affectedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rollbackAction"
+          }
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        }
+      }
+    },
+    "rollbackAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actionId", "type", "target", "status", "idempotencyKey"],
+      "properties": {
+        "actionId": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "RESTORE_FILE",
+            "RESTORE_ARTIFACT",
+            "REVERT_COMMIT",
+            "ROLLBACK_SCHEMA",
+            "ROLLBACK_DEPLOYMENT",
+            "CUSTOM"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["PLANNED", "RUNNING", "SUCCEEDED", "FAILED", "SKIPPED"]
+        },
+        "idempotencyKey": {
+          "type": "string"
+        }
+      }
+    },
+    "replan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replanId",
+        "fromPlanVersion",
+        "toPlanVersion",
+        "trigger",
+        "requirementVersion",
+        "changeSummary",
+        "addedTaskIds",
+        "invalidatedTaskIds",
+        "preservedTaskIds",
+        "staleArtifactIds",
+        "createdAt"
+      ],
+      "properties": {
+        "replanId": {
+          "type": "string"
+        },
+        "fromPlanVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "toPlanVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trigger": {
+          "enum": [
+            "REQUIREMENT_CHANGED",
+            "UPSTREAM_ARTIFACT_CHANGED",
+            "VALIDATION_FAILED",
+            "POLICY_CHANGED",
+            "HUMAN_REQUEST",
+            "FAILURE_RECOVERY"
+          ]
+        },
+        "requirementVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "changeSummary": {
+          "type": "string"
+        },
+        "addedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalidatedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preservedTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "staleArtifactIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "approvalId": {
+          "type": ["string", "null"]
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpointId",
+        "stateRevision",
+        "taskGraphVersion",
+        "snapshotUri",
+        "snapshotHash",
+        "resumableTaskIds",
+        "reason",
+        "createdAt"
+      ],
+      "properties": {
+        "checkpointId": {
+          "type": "string"
+        },
+        "stateRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "taskGraphVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "snapshotUri": {
+          "type": "string"
+        },
+        "snapshotHash": {
+          "type": "string"
+        },
+        "resumableTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["createdAt", "updatedAt", "lastCheckpointAt", "events"],
+      "properties": {
+        "createdAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "lastCheckpointAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/auditEvent"
+          }
+        }
+      }
+    },
+    "auditEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "sequence",
+        "timestamp",
+        "actor",
+        "action",
+        "entityType",
+        "entityId",
+        "stateRevision",
+        "payloadHash"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timestamp": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "actor": {
+          "$ref": "#/$defs/actor"
+        },
+        "action": {
+          "type": "string"
+        },
+        "entityType": {
+          "type": "string"
+        },
+        "entityId": {
+          "type": "string"
+        },
+        "stateRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correlationId": {
+          "type": ["string", "null"]
+        },
+        "causationEventId": {
+          "type": ["string", "null"]
+        },
+        "payloadHash": {
+          "type": "string"
+        },
+        "previousEventHash": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}
