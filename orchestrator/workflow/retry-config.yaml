@@ -1,0 +1,4 @@
+retry:
+  implementation:
+    # Total attempts: initial implementation plus corrective retries.
+    maxAttempts: 2

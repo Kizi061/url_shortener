@@ -19,6 +19,10 @@ The workflow is a design contract, not an executable engine. Agent names describ
 
 Durable runtime state for this graph must conform to the companion [workflow state schema](../state/workflow-state.schema.json). Resumption, idempotency, dynamic replanning, and cross-record invariants are described in the [shared-state rationale](../state/README.md).
 
+The executable bounded corrective cycle for implementation, test, and validation is specified in [Bounded Implementation Retry](implementation-retry.md), with limits loaded from [`retry-config.yaml`](retry-config.yaml).
+
+Approval-gated restoration from a known-good checkpoint is specified in [Controlled Rollback Handling](rollback-handling.md). Its runtime exposes ports for Git/database/artifact restoration but contains no destructive adapter.
+
 ### Workflow at a glance
 
 This compact view is a reading aid. The detailed DAG, gate rules, and recovery transitions later in this document remain authoritative.
@@ -267,8 +271,8 @@ Any material post-gate change invalidates this approval.
 | Requirement parsing or tool failure | Retry only when transient; ambiguity is not retried. | 1 retry |
 | Architecture generation failure | Retry after failure classification or corrected input. | 2 total attempts |
 | Planning failure | Retry after dependency or scope correction. | 2 total attempts |
-| Implementation tool or transient failure | Resume from checkpoint with the same idempotency key. | 2 retries |
-| Deterministic implementation defect | Create a corrective implementation successor node. | 2 corrective iterations |
+| Implementation tool or transient failure | Resume from checkpoint with the same task scope and preserved failure context. | 2 total attempts by current configuration |
+| Deterministic implementation defect | Run one targeted corrective implementation successor, then rerun test and validation. | 2 total attempts by current configuration |
 | Unit or integration test infrastructure failure | One unchanged rerun may distinguish a transient failure from a defect. | 1 rerun |
 | Deterministic test failure | Do not blindly rerun; create corrective implementation and replacement test nodes. | Within 2 corrective iterations |
 | Security tool failure | Retry only for tool or infrastructure failure. | 2 total attempts |
