@@ -1,0 +1,93 @@
+package com.example.urlshortener.controller;
+
+import com.example.urlshortener.domain.ShortUrl;
+import com.example.urlshortener.repository.ShortUrlRepository;
+import com.example.urlshortener.service.ShortCodeGenerator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class ShortUrlIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ShortUrlRepository repository;
+    @MockitoBean
+    private ShortCodeGenerator generator;
+
+    @BeforeEach
+    void setUp() {
+        repository.deleteAll();
+    }
+
+    @Test
+    void postCreatesAndPersistsShortUrl() throws Exception {
+        when(generator.nextCode()).thenReturn("aB12Cd");
+
+        mockMvc.perform(post("/api/urls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"originalUrl":"https://www.example.com/products/category/item/12345"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.shortCode").value("aB12Cd"))
+                .andExpect(jsonPath("$.shortUrl").value("http://localhost:8080/aB12Cd"))
+                .andExpect(jsonPath("$.originalUrl")
+                        .value("https://www.example.com/products/category/item/12345"));
+
+        ShortUrl saved = repository.findByShortCode("aB12Cd").orElseThrow();
+        assertThat(saved.getCreatedTimestamp()).isNotNull();
+    }
+
+    @Test
+    void postRejectsInvalidUrl() throws Exception {
+        mockMvc.perform(post("/api/urls")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"originalUrl\":\"not-a-url\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_URL"))
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void getRedirectsToOriginalUrl() throws Exception {
+        repository.save(new ShortUrl(
+                "aB12Cd",
+                "http://localhost:8080/aB12Cd",
+                "https://www.example.com/products/category/item/12345",
+                Instant.now()));
+
+        mockMvc.perform(get("/aB12Cd"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location",
+                        "https://www.example.com/products/category/item/12345"));
+    }
+
+    @Test
+    void getUnknownShortCodeReturns404() throws Exception {
+        mockMvc.perform(get("/xxxxxx"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Short URL was not found."));
+    }
+}

@@ -1,0 +1,19 @@
+# Java
+backend/target/
+*.class
+
+# JavaScript
+frontend/node_modules/
+frontend/dist/
+
+# IDE and local configuration
+.idea/
+.vscode/
+*.iml
+.env
+.env.local
+.run/
+
+# OS files
+.DS_Store
+Thumbs.db
