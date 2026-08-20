@@ -22,6 +22,7 @@ All decisions are **Accepted** for the current application unless marked otherwi
 | ADR-010 | Externalize runtime addresses, credentials, and CORS origin | Keep environment-specific values outside compiled code |
 | ADR-011 | Keep the first version stateless and synchronous | Minimize operational complexity for the current workload |
 | ADR-012 | Deduplicate exact original URLs with a SHA-256 uniqueness key | Prevent duplicate mappings safely under concurrent requests |
+| ADR-013 | Version lifecycle schema and atomically record access | Preserve redirect correctness while adding simple operational metrics |
 
 ## ADR-001: Separate React frontend and Spring Boot backend
 
@@ -372,7 +373,41 @@ The create flow:
 - The 64-character hash is efficient to index compared with the full URL.
 - The original string comparison prevents a theoretical hash collision from returning an unrelated mapping.
 - URL equivalence remains deliberately conservative: variations in case, query ordering, encoding, or trailing slashes are treated as different strings.
-- The hash column remains nullable to allow Hibernate to add it to databases containing legacy rows; all newly created rows populate it.
+- The hash column remains nullable so the Flyway migration can preserve legacy rows; all newly created rows populate it.
+
+## ADR-013: Version lifecycle schema and atomically record access
+
+**Status:** Accepted
+
+### Context
+
+Links need optional expiration, an administrative active state, a click count, and a last-access time. Concurrent redirects must not lose increments, and production schema changes should be repeatable.
+
+### Decision
+
+- Add nullable `expires_at`, required `active`, required `click_count`, and nullable `last_accessed_timestamp` columns.
+- Give new links a one-calendar-month lifetime and initialize last access from the same instant as creation.
+- Count both successful redirects and repeated submissions of an existing URL as access events.
+- Keep the unique short-code index as the redirect access path; evaluate lifecycle predicates after the unique lookup.
+- Increment clicks and set last access with one conditional atomic update.
+- Repeat active and expiration checks during the update to close the lookup/update race.
+- Manage MySQL schema changes with Flyway and set Hibernate to schema validation in runtime profiles.
+- Add only `(active, expires_at)` for maintenance scans; do not index frequently updated metric columns.
+
+### Alternatives considered
+
+- Read, increment, and save the counter through a managed entity.
+- Add a click-event row synchronously for every redirect.
+- Add active and expiration to a composite redirect index.
+- Continue using Hibernate `ddl-auto: update` in production.
+
+### Consequences
+
+- Concurrent SQL increments are not lost.
+- Inactive and expired links consistently return 404.
+- Each successful redirect currently performs one read and one write, which is simple but creates hot-row contention for viral links.
+- Flyway provides reviewable schema history, while the one-time baseline flag supports the existing pre-Flyway database.
+- At high traffic, click events should move off the synchronous redirect path and become eventually consistent.
 
 ## 3. Decision drivers
 
@@ -402,7 +437,7 @@ The following checks indicate whether the current architecture remains appropria
 
 These decisions are intentionally deferred and should be recorded before implementation:
 
-- Migration strategy: Flyway versus Liquibase.
+- Production rollout strategy for online Flyway migrations on large tables.
 - Production deployment topology and TLS termination.
 - Rate-limiting location: application, gateway, or reverse proxy.
 - Link expiration and cleanup policy.

@@ -133,7 +133,8 @@ flowchart TB
 `ShortUrlRepository` extends `JpaRepository` and exposes:
 
 - `existsByShortCode(String)` for the normal collision check.
-- `findByShortCode(String)` for redirect resolution.
+- `findRedirectCandidate(String, Instant)` for active, unexpired redirect resolution.
+- `recordSuccessfulAccess(Long, Instant)` for an atomic counter and last-access update.
 - `saveAndFlush(ShortUrl)` through `JpaRepository` so uniqueness failures surface during the retry operation.
 
 #### Cross-cutting components
@@ -157,6 +158,10 @@ erDiagram
         VARCHAR_512 short_url
         VARCHAR_2048 original_url
         VARCHAR_64 original_url_hash UK
+        DATETIME expires_at
+        BOOLEAN active
+        BIGINT click_count
+        DATETIME last_accessed_timestamp
         TIMESTAMP created_timestamp
     }
 ```
@@ -170,9 +175,13 @@ erDiagram
 | `short_url` | `String` | Required, maximum 512 | Complete public URL returned to clients |
 | `original_url` | `String` | Required, maximum 2048 | Redirect destination |
 | `original_url_hash` | `String` | SHA-256 hex, unique; nullable for legacy rows | Fixed-width uniqueness and indexed lookup key |
+| `expires_at` | `Instant` | Required | UTC time one calendar month after creation |
+| `active` | `boolean` | Required, defaults true | Administrative enable/disable state |
+| `click_count` | `long` | Required, nonnegative, defaults zero | Count of successful redirect decisions |
+| `last_accessed_timestamp` | `Instant` | Required | UTC time of creation or the most recent access |
 | `created_timestamp` | `Instant` | Required, immutable after insert | Creation time in UTC |
 
-The unique constraints on `short_code` and `original_url_hash` are the final authorities for uniqueness. The hash avoids an oversized MySQL index on the 2,048-character URL. The service confirms the original string after a hash lookup, so a theoretical hash collision cannot return the wrong mapping. Hibernate currently creates or updates the schema with `ddl-auto: update`.
+The unique constraints on `short_code` and `original_url_hash` are the final authorities for uniqueness. The hash avoids an oversized MySQL index on the 2,048-character URL. The service confirms the original string after a hash lookup, so a theoretical hash collision cannot return the wrong mapping. Flyway owns runtime schema changes and Hibernate uses `ddl-auto: validate`.
 
 ## 7. API design
 
@@ -199,6 +208,8 @@ Successful response for a new URL: `201 Created`
 ```
 
 If the exact `originalUrl` already exists, the endpoint returns the same response body and stored short code with `200 OK`. URL matching is exact; the application does not canonicalize hostname case, query ordering, trailing slashes, or other semantically debatable URL variations.
+
+For a new URL, `expires_at` is one UTC calendar month after `created_timestamp`, while `last_accessed_timestamp` initially equals `created_timestamp`. For an existing URL, the POST atomically increments `click_count` and refreshes `last_accessed_timestamp`.
 
 ### 7.2 Resolve a short URL
 
@@ -300,16 +311,17 @@ sequenceDiagram
 
     Browser->>Controller: GET /aB12Cd
     Controller->>Service: getOriginalUrl("aB12Cd")
-    Service->>Repo: findByShortCode("aB12Cd")
-    Repo->>DB: SELECT by unique code
-    DB-->>Repo: URL mapping
-    Repo-->>Service: original URL
+    Service->>Repo: find active, unexpired code
+    Repo->>DB: SELECT by unique code with lifecycle predicates
+    DB-->>Repo: eligible mapping
+    Service->>Repo: atomically record successful access
+    Repo->>DB: Increment click count and set last-access time
     Service-->>Controller: original URL
     Controller-->>Browser: 302 Location: original URL
     Browser->>Site: GET original URL
 ```
 
-If the repository returns no mapping, the service throws `ShortUrlNotFoundException`, which becomes a 404 JSON response.
+If the repository returns no active and unexpired mapping, the service throws `ShortUrlNotFoundException`, which becomes a 404 JSON response. The metric update repeats the lifecycle predicates to prevent a redirect if state changes between lookup and update.
 
 ## 9. Configuration and deployment
 
@@ -377,13 +389,13 @@ Current gaps for an internet-facing deployment include rate limiting, abuse dete
 
 ## 11. Test design
 
-The backend currently has 16 passing tests.
+The backend currently has 19 passing tests.
 
 | Test area | Coverage |
 |---|---|
 | Generator unit tests | Six-character alphanumeric format and varied output |
 | Service unit tests | Successful creation, existing-URL reuse, invalid URL, database lookup, missing code, normal collision, concurrent code collision, concurrent original-URL insertion, bounded retry failure |
-| API integration tests | New `POST /api/urls`, repeated POST without duplicate insertion, invalid POST, successful `GET /{shortCode}` redirect, unknown-code 404 |
+| API integration tests | New and repeated POST, invalid POST, redirect with metric update, inactive/expired link rejection, unknown-code 404 |
 
 Integration tests run with the `test` profile and an in-memory H2 database configured in MySQL compatibility mode. The code generator is overridden in endpoint tests so assertions remain deterministic.
 
@@ -407,7 +419,7 @@ The frontend currently has build verification but no automated component or brow
 
 1. Handle unsupported methods and missing routes explicitly as 404/405.
 2. Add request length validation and corresponding tests.
-3. Introduce Flyway migrations and disable schema mutation by Hibernate in production.
+3. Add an administrative API for expiration and active-state management.
 4. Add Spring Boot Actuator health and metrics endpoints.
 5. Add frontend unit tests and one browser-level create/redirect test.
 

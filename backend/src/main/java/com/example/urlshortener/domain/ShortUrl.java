@@ -5,15 +5,19 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "short_urls", uniqueConstraints = {
         @UniqueConstraint(name = "uk_short_urls_short_code", columnNames = "short_code"),
         @UniqueConstraint(name = "uk_short_urls_original_url_hash", columnNames = "original_url_hash")
+}, indexes = {
+        @Index(name = "idx_short_urls_active_expires_at", columnList = "active, expires_at")
 })
 public class ShortUrl {
 
@@ -33,6 +37,18 @@ public class ShortUrl {
     @Column(name = "original_url_hash", length = 64, unique = true)
     private String originalUrlHash;
 
+    @Column(name = "expires_at", nullable = false)
+    private Instant expiresAt;
+
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
+    @Column(name = "click_count", nullable = false)
+    private long clickCount;
+
+    @Column(name = "last_accessed_timestamp", nullable = false)
+    private Instant lastAccessedTimestamp;
+
     @Column(name = "created_timestamp", nullable = false, updatable = false)
     private Instant createdTimestamp;
 
@@ -49,6 +65,12 @@ public class ShortUrl {
         this.shortUrl = shortUrl;
         this.originalUrl = originalUrl;
         this.originalUrlHash = originalUrlHash;
+        this.expiresAt = createdTimestamp.atZone(ZoneOffset.UTC)
+                .plusMonths(1)
+                .toInstant();
+        this.active = true;
+        this.clickCount = 0;
+        this.lastAccessedTimestamp = createdTimestamp;
         this.createdTimestamp = createdTimestamp;
     }
 
@@ -70,6 +92,30 @@ public class ShortUrl {
 
     public String getOriginalUrlHash() {
         return originalUrlHash;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public long getClickCount() {
+        return clickCount;
+    }
+
+    public Instant getLastAccessedTimestamp() {
+        return lastAccessedTimestamp;
+    }
+
+    public void deactivate() {
+        this.active = false;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public Instant getCreatedTimestamp() {

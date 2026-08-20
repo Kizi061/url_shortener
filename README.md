@@ -13,6 +13,7 @@ frontend/  React, JavaScript, Vite, responsive CSS
 
 - [System design](docs/SYSTEM_DESIGN.md) - implemented architecture, components, data model, API flows, deployment, testing, and known limitations.
 - [Architecture decisions](docs/ARCHITECTURE_DECISIONS.md) - design reasoning, alternatives, tradeoffs, and future decision points.
+- [Database design](docs/DATABASE_DESIGN.md) - production schema, indexes, column rationale, concurrency controls, migrations, and high-traffic evolution.
 
 ## Prerequisites
 
@@ -34,7 +35,9 @@ cd backend
 mvn spring-boot:run
 ```
 
-Hibernate creates or updates the `short_urls` table. A database-level unique constraint protects `short_code` in addition to the service collision check and bounded retry logic.
+Flyway creates and versions the `short_urls` table, and Hibernate validates it at runtime. Database constraints protect short-code and original-URL uniqueness.
+
+If this is an existing database created before Flyway was added, set `$env:FLYWAY_BASELINE_ON_MIGRATE = "true"` for the first controlled startup only, then remove it. New databases do not need this setting.
 
 ## Start the frontend
 
@@ -72,6 +75,8 @@ Successful response (`201 Created`):
 ```
 
 Submitting the same `originalUrl` again returns the existing mapping with `200 OK`; it does not create another database record or short code.
+
+New links expire one calendar month after creation. Their creation and initial last-access timestamps are identical. Re-submitting an existing URL atomically increments its click count and refreshes its last-access timestamp.
 
 Visiting `GET /aB12Cd` returns `302 Found` with the original URL in the `Location` header.
 

@@ -43,9 +43,11 @@ public class ShortUrlService {
     public ShortUrlCreationResult createShortUrl(String originalUrl) {
         urlValidator.validate(originalUrl);
         String originalUrlHash = originalUrlHasher.hash(originalUrl);
+        Instant requestTimestamp = Instant.now(clock);
 
         Optional<ShortUrl> existing = findExisting(originalUrl, originalUrlHash);
         if (existing.isPresent()) {
+            repository.recordExistingUrlAccess(existing.get().getId(), requestTimestamp);
             return new ShortUrlCreationResult(toResponse(existing.get()), false);
         }
 
@@ -61,7 +63,7 @@ public class ShortUrlService {
                     shortUrlValue,
                     originalUrl,
                     originalUrlHash,
-                    Instant.now(clock));
+                    requestTimestamp);
 
             try {
                 ShortUrl saved = repository.saveAndFlush(entity);
@@ -69,6 +71,8 @@ public class ShortUrlService {
             } catch (DataIntegrityViolationException exception) {
                 Optional<ShortUrl> concurrentlyCreated = findExisting(originalUrl, originalUrlHash);
                 if (concurrentlyCreated.isPresent()) {
+                    repository.recordExistingUrlAccess(
+                            concurrentlyCreated.get().getId(), requestTimestamp);
                     return new ShortUrlCreationResult(toResponse(concurrentlyCreated.get()), false);
                 }
                 // Otherwise, a concurrent request may have persisted the same short code.
@@ -79,9 +83,16 @@ public class ShortUrlService {
     }
 
     public String getOriginalUrl(String shortCode) {
-        return repository.findByShortCode(shortCode)
-                .map(ShortUrl::getOriginalUrl)
+        Instant accessedAt = Instant.now(clock);
+        ShortUrl shortUrl = repository.findRedirectCandidate(shortCode, accessedAt)
                 .orElseThrow(() -> new ShortUrlNotFoundException(shortCode));
+
+        int updatedRows = repository.recordSuccessfulAccess(shortUrl.getId(), accessedAt);
+        if (updatedRows == 0) {
+            throw new ShortUrlNotFoundException(shortCode);
+        }
+
+        return shortUrl.getOriginalUrl();
     }
 
     private Optional<ShortUrl> findExisting(String originalUrl, String originalUrlHash) {

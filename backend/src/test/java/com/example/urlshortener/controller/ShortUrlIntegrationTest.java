@@ -60,6 +60,12 @@ class ShortUrlIntegrationTest {
 
         ShortUrl saved = repository.findByShortCode("aB12Cd").orElseThrow();
         assertThat(saved.getCreatedTimestamp()).isNotNull();
+        assertThat(saved.getLastAccessedTimestamp()).isEqualTo(saved.getCreatedTimestamp());
+        assertThat(saved.getExpiresAt())
+                .isEqualTo(saved.getCreatedTimestamp().atZone(java.time.ZoneOffset.UTC)
+                        .plusMonths(1)
+                        .toInstant());
+        assertThat(saved.getClickCount()).isZero();
     }
 
     @Test
@@ -83,6 +89,10 @@ class ShortUrlIntegrationTest {
                 .andExpect(jsonPath("$.shortUrl").value("http://localhost:8080/same01"));
 
         assertThat(repository.count()).isEqualTo(1);
+        ShortUrl reused = repository.findByShortCode("same01").orElseThrow();
+        assertThat(reused.getClickCount()).isEqualTo(1);
+        assertThat(reused.getLastAccessedTimestamp())
+                .isAfterOrEqualTo(reused.getCreatedTimestamp());
         verify(generator, times(1)).nextCode();
     }
 
@@ -110,6 +120,42 @@ class ShortUrlIntegrationTest {
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location",
                         "https://www.example.com/products/category/item/12345"));
+
+        ShortUrl accessed = repository.findByShortCode("aB12Cd").orElseThrow();
+        assertThat(accessed.getClickCount()).isEqualTo(1);
+        assertThat(accessed.getLastAccessedTimestamp()).isNotNull();
+    }
+
+    @Test
+    void inactiveShortCodeReturns404() throws Exception {
+        ShortUrl inactive = new ShortUrl(
+                "off123",
+                "http://localhost:8080/off123",
+                "https://example.com/inactive",
+                new OriginalUrlHasher().hash("https://example.com/inactive"),
+                Instant.now());
+        inactive.deactivate();
+        repository.save(inactive);
+
+        mockMvc.perform(get("/off123"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"));
+    }
+
+    @Test
+    void expiredShortCodeReturns404() throws Exception {
+        ShortUrl expired = new ShortUrl(
+                "old123",
+                "http://localhost:8080/old123",
+                "https://example.com/expired",
+                new OriginalUrlHasher().hash("https://example.com/expired"),
+                Instant.now().minusSeconds(120));
+        expired.setExpiresAt(Instant.now().minusSeconds(60));
+        repository.save(expired);
+
+        mockMvc.perform(get("/old123"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHORT_URL_NOT_FOUND"));
     }
 
     @Test

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -64,7 +65,14 @@ class ShortUrlServiceTest {
         assertThat(response.shortCode()).isEqualTo("aB12Cd");
         assertThat(response.shortUrl()).isEqualTo("http://localhost:8080/aB12Cd");
         assertThat(response.originalUrl()).isEqualTo(originalUrl);
-        verify(repository).saveAndFlush(any(ShortUrl.class));
+        ArgumentCaptor<ShortUrl> entityCaptor = ArgumentCaptor.forClass(ShortUrl.class);
+        verify(repository).saveAndFlush(entityCaptor.capture());
+        ShortUrl saved = entityCaptor.getValue();
+        assertThat(saved.getCreatedTimestamp()).isEqualTo(NOW);
+        assertThat(saved.getLastAccessedTimestamp()).isEqualTo(NOW);
+        assertThat(saved.getExpiresAt()).isEqualTo(Instant.parse("2026-09-19T18:30:00Z"));
+        assertThat(saved.getClickCount()).isZero();
+        assertThat(saved.isActive()).isTrue();
     }
 
     @Test
@@ -84,6 +92,7 @@ class ShortUrlServiceTest {
         assertThat(result.created()).isFalse();
         assertThat(result.response().shortCode()).isEqualTo("old123");
         assertThat(result.response().shortUrl()).isEqualTo("http://localhost:8080/old123");
+        verify(repository).recordExistingUrlAccess(null, NOW);
         verify(generator, never()).nextCode();
         verify(repository, never()).saveAndFlush(any(ShortUrl.class));
     }
@@ -102,16 +111,33 @@ class ShortUrlServiceTest {
                 "https://example.com/page",
                 new OriginalUrlHasher().hash("https://example.com/page"),
                 NOW);
-        when(repository.findByShortCode("aB12Cd")).thenReturn(Optional.of(entity));
+        when(repository.findRedirectCandidate("aB12Cd", NOW)).thenReturn(Optional.of(entity));
+        when(repository.recordSuccessfulAccess(null, NOW)).thenReturn(1);
 
         assertThat(service.getOriginalUrl("aB12Cd")).isEqualTo("https://example.com/page");
+        verify(repository).recordSuccessfulAccess(null, NOW);
     }
 
     @Test
     void throwsNotFoundForUnknownShortCode() {
-        when(repository.findByShortCode("xxxxxx")).thenReturn(Optional.empty());
+        when(repository.findRedirectCandidate("xxxxxx", NOW)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getOriginalUrl("xxxxxx"))
+                .isInstanceOf(ShortUrlNotFoundException.class);
+    }
+
+    @Test
+    void rejectsRedirectWhenLinkChangesStateAfterLookup() {
+        ShortUrl entity = new ShortUrl(
+                "aB12Cd",
+                "http://localhost:8080/aB12Cd",
+                "https://example.com/page",
+                new OriginalUrlHasher().hash("https://example.com/page"),
+                NOW);
+        when(repository.findRedirectCandidate("aB12Cd", NOW)).thenReturn(Optional.of(entity));
+        when(repository.recordSuccessfulAccess(null, NOW)).thenReturn(0);
+
+        assertThatThrownBy(() -> service.getOriginalUrl("aB12Cd"))
                 .isInstanceOf(ShortUrlNotFoundException.class);
     }
 
@@ -164,6 +190,7 @@ class ShortUrlServiceTest {
 
         assertThat(result.created()).isFalse();
         assertThat(result.response().shortCode()).isEqualTo("other1");
+        verify(repository).recordExistingUrlAccess(null, NOW);
     }
 
     @Test
